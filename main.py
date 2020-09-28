@@ -10,12 +10,20 @@ standbyIP = "192.168.1.110"
 
 
 zoomspeed = 5
+maxPanSpeed = 10
+maxTiltSpeed = 10
 
 class Axis:
     x = 0
     y = 0
 
-
+class Preset:
+    position = 0
+    lastPressed = time.time()
+    
+    def __init__(self, pos):
+        self.position = pos
+    
 def panTilt(axis):
     global lastUrl
     direction = ""
@@ -28,11 +36,11 @@ def panTilt(axis):
     elif axis.y < -0.2:
         direction += "up"
 
-    pan = int(abs(axis.x) * 24)
-    tilt = int(abs(axis.y) * 20)
+    pan = int(abs(axis.x) * maxPanSpeed)
+    tilt = int(abs(axis.y) * maxTiltSpeed)
 
 
-    if 0.1 > axis.x > -0.1 and 0.1 > axis.y > -0.1:
+    if 0.19 > axis.x > -0.19 and 0.19 > axis.y > -0.19:
         direction = "ptzstop"
 
     if direction == "":
@@ -62,13 +70,32 @@ def switchIP(button):
     global ip, standbyIP
     controller.set_rumble(1, 1, 80)
     ip, standbyIP = standbyIP, ip
+    
+def handlePresetStart(button):
+    global presets
+    presets[button.name].lastPressed = time.time()
+
+def handlePreset(button):
+    if time.time() - presets[button.name].lastPressed > 1:
+        action = "posset"
+        controller.set_rumble(1, 1, 150)
+    else:
+        action = "poscall"
+
+    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&{action}&{presets[button.name].position}")
+    print('Button {0} was released'.format(button.name))
 
 axis = Axis()
 lastUrl = ""
 
+presets = {
+    "button_a": Preset(1),
+    "button_b": Preset(2),
+    "button_x": Preset(3),
+    "button_y": Preset(4),
+}
+
 if __name__ == '__main__':
-    #pt = threading.Thread(target=panTilt)
-    #pt.start()
     try:
         with Xbox360Controller(0, axis_threshold=0) as controller:
 
@@ -80,6 +107,16 @@ if __name__ == '__main__':
 
             controller.button_start.when_pressed = switchIP
 
+            controller.button_a.when_pressed = handlePresetStart
+            controller.button_b.when_pressed = handlePresetStart
+            controller.button_x.when_pressed = handlePresetStart
+            controller.button_y.when_pressed = handlePresetStart
+
+            controller.button_a.when_released = handlePreset
+            controller.button_b.when_released = handlePreset
+            controller.button_x.when_released = handlePreset
+            controller.button_y.when_released = handlePreset
+
             # Left and right axis move event
             #controller.axis_l.when_moved = on_axis_moved
             #controller.axis_r.when_moved = on_axis_moved
@@ -88,7 +125,7 @@ if __name__ == '__main__':
                 axis.x = controller.axis_l.x
                 axis.y = controller.axis_l.y
                 panTilt(axis)
-                time.sleep(0.1)
+                time.sleep(0.15)
             signal.pause()
     except KeyboardInterrupt:
         pass
