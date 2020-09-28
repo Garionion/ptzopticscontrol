@@ -1,5 +1,4 @@
 import signal
-import threading
 from xbox360controller import Xbox360Controller
 import datetime
 import time
@@ -8,10 +7,6 @@ from camera import Camera
 
 cam = Camera("192.168.1.113")
 secondCam = Camera("192.168.1.110")
-
-
-ip = "192.168.1.113"
-standbyIP = "192.168.1.110"
 
 
 zoomspeed = 5
@@ -28,23 +23,22 @@ class Preset:
     
     def __init__(self, pos):
         self.position = pos
-    
-def panTilt(axis: Axis):
-    pan_speed = axis.x*maxPanSpeed if abs(axis.x) > 0.19 else 0
-    tilt_speed = axis.y*maxTiltSpeed if abs(axis.y) > 0.19 else 0
-    cam.move(pan_speed=pan_speed, tilt_speed=tilt_speed)
 
+def panTilt(axis: Axis):
+    panSpeed = int(axis.x*maxPanSpeed) if abs(axis.x) > 0.19 else 0
+    tiltSpeed = int(axis.y*maxTiltSpeed) if abs(axis.y) > 0.19 else 0
+    cam.move(panSpeed=panSpeed, tiltSpeed=tiltSpeed)
 
 def zoomin(button):
-    cam.zoomin(zoom_speed=None)
+    cam.zoom("zoomin", zoomspeed=None)
 
 
 def zoomout(button):
-    cam.zoomout(zoom_speed=None)
+    cam.zoom("zoomout", zoomspeed=None)
 
 
 def zoomstop(button):
-    cam.zoomstop(zoom_speed=None)
+    cam.zoom("zoomstop", zoomspeed=0)
 
 def switchIP(button):
     global cam, secondCam
@@ -59,16 +53,19 @@ def handlePresetStart(button):
 def handlePreset(button):
     preset = presets[button.name].position
 
-    if time.time() - presets[button.name].lastPressed > 1:
+    if time.time() - presets[button.name].lastPressed > 0.4:
         controller.set_rumble(1, 1, 150)
-        cam.posset(preset=preset)
+        cam.set_preset(preset)
     else:
-        cam.posset(preset=preset)
+        cam.call_preset(preset)
 
+
+def on_button_released(button):
     print('Button {0} was released'.format(button.name))
 
 axis = Axis()
 lastUrl = ""
+
 
 presets = {
     "button_a": Preset(1),
