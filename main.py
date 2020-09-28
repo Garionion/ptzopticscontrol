@@ -1,5 +1,5 @@
 import signal
-import threading
+import socket
 from xbox360controller import Xbox360Controller
 import datetime
 import time
@@ -23,7 +23,57 @@ class Preset:
     
     def __init__(self, pos):
         self.position = pos
+
+class Cam:
+    actions = dict(
+        up="03 01",
+        down="03 02",
+        left="01 03",
+        right="02 03",
+        upleft="01 01",
+        upright="02 01",
+        downleft="01 02",
+        downright="02 02",
+        stop="03 03",
+        zoomin="2",
+        zoomout="3",
+    )
     
+    def __init__(self, ip, port=1259):
+        self.ip = ip
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)  # UDP
+    
+    def send(self, msg):
+        self.sock.sendto(msg, (self.ip, self.port))
+        recvMsg = 0
+        while True:
+            nextBytes = self.sock.recv(50)
+            recvMsg = int(nextBytes.hex(), 16)
+            if 9461759 >= recvMsg >= 9457919:
+                recvMsg = 0
+                continue
+            elif 9457663 >= recvMsg >= 9453823:
+                break
+    
+    def zoom(self, action, speed):
+        act = Cam.actions.get(action, Cam.actions["zoomin"])
+        msg = bytearray.fromhex(f"81 01 04 07 {act}{speed} FF")
+        self.send(msg)
+     
+    def move(self, action, panSpeed, tiltSpeed):
+        act = Cam.actions.get(action, Cam.actions["stop"])
+        msg = bytearray.fromhex(f"81 01 06 01 01 01 {act} FF")
+        self.send(msg)
+        
+    def set_preset(self, preset):
+        msg = bytearray.fromhex(f"81 01 04 3F 01 {preset} FF")
+        self.send(msg)
+
+    def call_preset(self, preset):
+        msg = bytearray.fromhex(f"81 01 04 3F 02 {preset} FF")
+        self.send(msg)
+
 def panTilt(axis):
     global lastUrl
     direction = ""
@@ -88,6 +138,7 @@ def handlePreset(button):
 axis = Axis()
 lastUrl = ""
 
+
 presets = {
     "button_a": Preset(1),
     "button_b": Preset(2),
@@ -96,6 +147,8 @@ presets = {
 }
 
 if __name__ == '__main__':
+    cam = Cam("192.168.1.110")
+    cam.move("left", "01", "01")
     try:
         with Xbox360Controller(0, axis_threshold=0) as controller:
 
