@@ -4,6 +4,11 @@ from xbox360controller import Xbox360Controller
 import datetime
 import time
 import requests
+from camera import Camera
+
+cam = Camera("192.168.1.113")
+secondCam = Camera("192.168.1.110")
+
 
 ip = "192.168.1.113"
 standbyIP = "192.168.1.110"
@@ -24,65 +29,42 @@ class Preset:
     def __init__(self, pos):
         self.position = pos
     
-def panTilt(axis):
-    global lastUrl
-    direction = ""
-    if axis.x > 0.2:
-        direction += "right"
-    elif axis.x < -0.2:
-        direction += "left"
-    if axis.y > 0.2:
-        direction += "down"
-    elif axis.y < -0.2:
-        direction += "up"
-
-    pan = int(abs(axis.x) * maxPanSpeed)
-    tilt = int(abs(axis.y) * maxTiltSpeed)
-
-
-    if 0.19 > axis.x > -0.19 and 0.19 > axis.y > -0.19:
-        direction = "ptzstop"
-
-    if direction == "":
-        return
-    url = f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&{direction}&{pan}&{tilt}"
-    if lastUrl == url:
-        return
-    lastUrl = url
-    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&{direction}&{pan}&{tilt}")
-    print(f"{datetime.datetime.now()} - {r.url}")
+def panTilt(axis: Axis):
+    pan_speed = axis.x*maxPanSpeed if abs(axis.x) > 0.19 else 0
+    tilt_speed = axis.y*maxTiltSpeed if abs(axis.y) > 0.19 else 0
+    cam.move(pan_speed=pan_speed, tilt_speed=tilt_speed)
 
 
 def zoomin(button):
-    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&zoomin&{zoomspeed}")
-    print(f"{datetime.datetime.now()} - {r.url}")
+    cam.zoomin(zoom_speed=None)
+
 
 def zoomout(button):
-    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&zoomout&{zoomspeed}")
-    print(f"{datetime.datetime.now()} - {r.url}")
+    cam.zoomout(zoom_speed=None)
 
 
 def zoomstop(button):
-    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&zoomstop&{zoomspeed}")
-    print(f"{datetime.datetime.now()} - {r.url}")
+    cam.zoomstop(zoom_speed=None)
 
 def switchIP(button):
-    global ip, standbyIP
+    global cam, secondCam
     controller.set_rumble(1, 1, 80)
-    ip, standbyIP = standbyIP, ip
+    cam, secondCam = secondCam, cam
     
 def handlePresetStart(button):
     global presets
     presets[button.name].lastPressed = time.time()
 
-def handlePreset(button):
-    if time.time() - presets[button.name].lastPressed > 1:
-        action = "posset"
-        controller.set_rumble(1, 1, 150)
-    else:
-        action = "poscall"
 
-    r = requests.get(f"http://{ip}/cgi-bin/ptzctrl.cgi?ptzcmd&{action}&{presets[button.name].position}")
+def handlePreset(button):
+    preset = presets[button.name].position
+
+    if time.time() - presets[button.name].lastPressed > 1:
+        controller.set_rumble(1, 1, 150)
+        cam.posset(preset=preset)
+    else:
+        cam.posset(preset=preset)
+
     print('Button {0} was released'.format(button.name))
 
 axis = Axis()
