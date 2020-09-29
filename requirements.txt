@@ -1,2 +1,2 @@
-xbox360controller
+git+https://github.com/Garionion/xbox360controller.git
 requests
